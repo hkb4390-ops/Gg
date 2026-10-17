@@ -1,323 +1,49 @@
-<!DOCTYPE html>
-<html lang="hi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Target Board Course & Video Viewer</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-</head>
-<body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
-
-    <!-- Header -->
-    <header class="bg-slate-800 border-b border-slate-700 sticky top-0 z-50 shadow-md">
-        <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-            <div class="flex items-center space-x-3 cursor-pointer" onclick="goHome()">
-                <div class="bg-indigo-600 p-2 rounded-xl text-white">
-                    <i class="fa-solid fa-graduation-cap text-xl"></i>
-                </div>
-                <div>
-                    <h1 class="text-xl font-bold tracking-wide">Target Board App</h1>
-                    <p class="text-xs text-slate-400">Backend API Course Viewer</p>
-                </div>
-            </div>
-            <!-- Search bar -->
-            <div class="w-full sm:w-80 relative" id="search-container">
-                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-                    <i class="fa-solid fa-search"></i>
-                </span>
-                <input type="text" id="searchInput" onkeyup="filterCourses()" placeholder="Search courses..." 
-                    class="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:border-indigo-500 text-sm placeholder-slate-400">
-            </div>
-        </div>
-    </header>
-
-    <!-- Main Container -->
-    <main class="max-w-7xl mx-auto px-4 py-6">
-        
-        <!-- Breadcrumb / Back button bar -->
-        <div id="navigationBar" class="mb-6 hidden items-center justify-between bg-slate-800 p-3 rounded-lg border border-slate-700">
-            <button onclick="goHome()" class="flex items-center space-x-2 text-indigo-400 hover:text-indigo-300 font-medium text-sm transition">
-                <i class="fa-solid fa-arrow-left"></i>
-                <span>Back to Courses</span>
-            </button>
-            <span id="breadcrumbTitle" class="text-sm font-semibold text-slate-300"></span>
-        </div>
-
-        <!-- Loading Spinner -->
-        <div id="loading" class="flex flex-col items-center justify-center py-20">
-            <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mb-4"></div>
-            <p class="text-slate-400 text-sm">Loading data from API...</p>
-        </div>
-
-        <!-- Error Box -->
-        <div id="errorBox" class="hidden bg-red-900/50 border border-red-700 text-red-200 px-4 py-3 rounded-lg text-center my-10">
-            <p id="errorMessage">Failed to load data.</p>
-            <button onclick="fetchCourses()" class="mt-3 bg-red-700 hover:bg-red-600 text-white px-4 py-1.5 rounded text-sm font-medium transition">Retry</button>
-        </div>
-
-        <!-- Courses Grid View -->
-        <div id="coursesView" class="hidden">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-lg font-bold text-slate-200">All Available Courses</h2>
-                <span id="courseCount" class="text-xs bg-indigo-900 text-indigo-300 px-2.5 py-1 rounded-full font-medium"></span>
-            </div>
-            <div id="coursesGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                <!-- Course cards will be injected here via JS -->
-            </div>
-        </div>
-
-        <!-- Course Content / Folders View -->
-        <div id="contentView" class="hidden">
-            <div id="contentList" class="space-y-3">
-                <!-- Folders, Videos, and PDFs will be injected here -->
-            </div>
-        </div>
-
-    </main>
-
-    <!-- Video Player Modal -->
-    <div id="videoModal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-slate-800 border border-slate-700 w-full max-w-4xl rounded-xl overflow-hidden shadow-2xl flex flex-col">
-            <div class="flex justify-between items-center p-4 border-b border-slate-700">
-                <h3 class="font-semibold text-slate-200 text-sm truncate" id="videoModalTitle">Video Player</h3>
-                <button onclick="closeVideoModal()" class="text-slate-400 hover:text-white text-lg px-2">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </div>
-            <div class="p-4 bg-black flex items-center justify-center relative aspect-video">
-                <div id="videoLoader" class="absolute inset-0 flex items-center justify-center bg-black/60 z-10">
-                    <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-indigo-500"></div>
-                </div>
-                <iframe id="videoIframe" src="" class="w-full h-full border-0 rounded" allowfullscreen></iframe>
-            </div>
-        </div>
-    </div>
-
-    <!-- JavaScript Logic -->
-    <script>
-        const API_BASE = "https://studyapkmod.free.nf/tbapi/api.php";
-        let allCoursesData = [];
-
-        // Initialize App on Load
-        window.addEventListener('DOMContentLoaded', () => {
-            fetchCourses();
-        });
-
-        // 1. Fetch All Courses
-        async function fetchCourses() {
-            showLoading(true);
-            hideError();
-            document.getElementById('coursesView').classList.add('hidden');
-            document.getElementById('navigationBar').classList.add('hidden');
-            document.getElementById('search-container').style.display = 'block';
-
-            try {
-                let response = await fetch(`${API_BASE}?courses`);
-                let data = await response.json();
-                
-                // Handle different possible JSON key structures
-                allCoursesData = Array.isArray(data) ? data : (data.courses || data.data || []);
-                
-                displayCourses(allCoursesData);
-                document.getElementById('courseCount').innerText = `${allCoursesData.length} Courses`;
-                document.getElementById('coursesView').classList.remove('hidden');
-            } catch (err) {
-                console.error("API Error:", err);
-                showError("Could not connect to API or parse response. Please check network.");
-            } finally {
-                showLoading(false);
-            }
-        }
-
-        // Display Courses Grid
-        function displayCourses(courses) {
-            const grid = document.getElementById('coursesGrid');
-            grid.innerHTML = '';
-
-            if (courses.length === 0) {
-                grid.innerHTML = `<div class="col-span-full text-center py-10 text-slate-400">No courses found.</div>`;
-                return;
-            }
-
-            courses.forEach(course => {
-                let courseId = course._id || course.id || course.course_id;
-                let title = course.title || course.name || "Untitled Course";
-                let thumbnail = course.thumbnail || course.image || "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=500&auto=format&fit=crop&q=60";
-                let desc = course.description || course.subtitle || "Access complete video lectures and study material.";
-
-                let card = document.createElement('div');
-                card.className = "bg-slate-800 border border-slate-700 rounded-xl overflow-hidden hover:border-indigo-500 transition shadow-md flex flex-col justify-between cursor-pointer group";
-                card.onclick = () => loadCourseContent(courseId, title);
-
-                card.innerHTML = `
-                    <div>
-                        <div class="h-40 overflow-hidden bg-slate-700 relative">
-                            <img src="${thumbnail}" alt="${title}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
-                        </div>
-                        <div class="p-4">
-                            <h3 class="font-bold text-slate-100 text-base mb-1 line-clamp-2">${title}</h3>
-                            <p class="text-xs text-slate-400 line-clamp-2">${desc}</p>
-                        </div>
-                    </div>
-                    <div class="px-4 pb-4 pt-0 flex justify-between items-center">
-                        <span class="text-xs text-indigo-400 font-medium">Explore Course</span>
-                        <i class="fa-solid fa-chevron-right text-xs text-indigo-400"></i>
-                    </div>
-                `;
-                grid.appendChild(card);
-            });
-        }
-
-        // Search Filter
-        function filterCourses() {
-            let query = document.getElementById('searchInput').value.toLowerCase();
-            let filtered = allCoursesData.filter(c => {
-                let title = (c.title || c.name || "").toLowerCase();
-                return title.includes(query);
-            });
-            displayCourses(filtered);
-        }
-
-        // 2. Load Course Content by ID (Folders/Videos/PDFs)
-        async function loadCourseContent(courseId, courseTitle) {
-            showLoading(true);
-            hideError();
-            document.getElementById('coursesView').classList.add('hidden');
-            document.getElementById('search-container').style.display = 'none';
-
-            document.getElementById('breadcrumbTitle').innerText = courseTitle;
-            document.getElementById('navigationBar').classList.remove('hidden');
-
-            try {
-                let response = await fetch(`${API_BASE}?courseid=${courseId}`);
-                let data = await response.json();
-                
-                renderContentTree(data);
-                document.getElementById('contentView').classList.remove('hidden');
-            } catch (err) {
-                console.error("Content API Error:", err);
-                showError("Failed to load course contents.");
-            } finally {
-                showLoading(false);
-            }
-        }
-
-        // Render Folders, Videos & Files recursively or flat
-        function renderContentTree(data) {
-            const container = document.getElementById('contentList');
-            container.innerHTML = '';
-
-            // Handle different possible payload formats (folders/contents array)
-            let items = Array.isArray(data) ? data : (data.content || data.folders || data.data || [data]);
-
-            if (!items || items.length === 0) {
-                container.innerHTML = `<div class="text-center py-10 text-slate-400">No content available inside this course.</div>`;
-                return;
-            }
-
-            items.forEach(item => {
-                createItemElement(item, container);
-            });
-        }
-
-        function createItemElement(item, parentContainer) {
-            let title = item.title || item.name || item.filename || "Untitled Item";
-            let type = (item.type || item.content_type || "").toLowerCase();
-            let assetId = item.asset_id || item.video_id || item.id;
-            let fileUrl = item.url || item.file_url;
-
-            let el = document.createElement('div');
-            el.className = "bg-slate-800 border border-slate-700 p-4 rounded-xl flex items-center justify-between hover:bg-slate-750 transition";
-
-            let icon = "fa-folder text-amber-400";
-            let actionHtml = "";
-
-            if (type.includes('video') || assetId) {
-                icon = "fa-video text-indigo-400";
-                actionHtml = `<button onclick="fetchAndPlayVideo('${assetId || item.id}', '${title}')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded text-xs font-medium transition flex items-center space-x-1.5">
-                    <i class="fa-solid fa-play"></i><span>Play Video</span>
-                </button>`;
-            } else if (type.includes('pdf') || type.includes('document')) {
-                icon = "fa-file-pdf text-red-400";
-                actionHtml = fileUrl ? `<a href="${fileUrl}" target="_blank" class="bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 rounded text-xs font-medium transition flex items-center space-x-1.5">
-                    <i class="fa-solid fa-download"></i><span>Open PDF</span>
-                </a>` : `<span class="text-xs text-slate-500">Not Available</span>`;
-            } else {
-                // Folder or generic item
-                actionHtml = `<span class="text-xs text-slate-400 font-medium">Folder</span>`;
-            }
-
-            el.innerHTML = `
-                <div class="flex items-center space-x-3 overflow-hidden">
-                    <i class="fa-solid ${icon} text-lg w-6 text-center"></i>
-                    <span class="text-sm font-medium text-slate-200 truncate">${title}</span>
-                </div>
-                <div>${actionHtml}</div>
-            `;
-            parentContainer.appendChild(el);
-        }
-
-        // 3. Fetch Video URL by Asset ID and Open Player
-        async function fetchAndPlayVideo(assetId, videoTitle) {
-            const modal = document.getElementById('videoModal');
-            const iframe = document.getElementById('videoIframe');
-            const loader = document.getElementById('videoLoader');
-            
-            document.getElementById('videoModalTitle').innerText = videoTitle;
-            modal.classList.remove('hidden');
-            loader.style.display = 'flex';
-            iframe.src = "";
-
-            try {
-                let response = await fetch(`${API_BASE}?video=${assetId}`);
-                let data = await response.json();
-                
-                // Extract video url from response
-                let videoUrl = data.url || data.video_url || data.link || (typeof data === 'string' ? data : "");
-                
-                if (videoUrl) {
-                    iframe.src = videoUrl;
-                } else {
-                    alert("Video URL not found in API response.");
-                    closeVideoModal();
-                }
-            } catch (err) {
-                console.error("Video API Error:", err);
-                alert("Failed to fetch video stream URL.");
-                closeVideoModal();
-            } finally {
-                loader.style.display = 'none';
-            }
-        }
-
-        function closeVideoModal() {
-            document.getElementById('videoModal').classList.add('hidden');
-            document.getElementById('videoIframe').src = "";
-        }
-
-        // Navigation helpers
-        function goHome() {
-            document.getElementById('contentView').classList.add('hidden');
-            document.getElementById('navigationBar').classList.add('hidden');
-            document.getElementById('coursesView').classList.remove('hidden');
-            document.getElementById('search-container').style.display = 'block';
-        }
-
-        function showLoading(show) {
-            document.getElementById('loading').style.display = show ? 'flex' : 'none';
-        }
-
-        function showError(msg) {
-            document.getElementById('errorMessage').innerText = msg;
-            document.getElementById('errorBox').classList.remove('hidden');
-        }
-
-        function hideError() {
-            document.getElementById('errorBox').classList.add('hidden');
-        }
-    </script>
-</body>
-</html>
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#080b12"><title>studymods.hrry — Admin</title>
+<style>
+:root{color-scheme:dark;--bg:#080b12;--card:rgba(19,27,42,.78);--line:#ffffff18;--muted:#98a6bb;--blue:#55cfff;--violet:#8290ff;--green:#43dfa0;--red:#ff6574}*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 10% 0,#132a43 0,transparent 38%),radial-gradient(ellipse at 100% 100%,#251632 0,transparent 35%),var(--bg);color:#f7f9ff;font:15px/1.45 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh}button,input,textarea,select{font:inherit}button{cursor:pointer;border:0;border-radius:12px;padding:11px 15px;font-weight:750;color:#07101b;background:linear-gradient(135deg,var(--blue),var(--violet))}button:disabled{opacity:.45;cursor:not-allowed}.secondary{background:#ffffff12;color:#f7f9ff;border:1px solid var(--line)}.danger{background:#ff65741a;color:#ff8d99;border:1px solid #ff65744a}.green{background:#43dfa01a;color:#6af0b8;border:1px solid #43dfa04a}.wrap{width:min(1100px,100%);margin:auto;padding:24px 16px 70px}.brand{display:flex;align-items:center;gap:13px;margin:6px 0 22px}.logo{width:48px;height:48px;border-radius:16px;display:grid;place-items:center;background:linear-gradient(135deg,#55cfff,#8290ff);color:#07101b;font-size:20px;font-weight:950;box-shadow:0 10px 30px #55cfff25}.brand h1{font-size:clamp(22px,4vw,30px);margin:0;letter-spacing:-.8px}.sub{color:var(--muted);font-size:13px;margin-top:3px}.status{padding:12px 14px;background:#ffffff09;border:1px solid var(--line);border-radius:13px;color:#b9eaff;margin-bottom:16px;overflow-wrap:anywhere}.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:19px;margin-bottom:17px;backdrop-filter:blur(24px);box-shadow:0 20px 55px #0003}.card h2{font-size:18px;margin:0 0 15px}.login{max-width:440px;margin:8vh auto}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.field{min-width:0}.field.full{grid-column:1/-1}label{display:block;color:var(--muted);font-size:12px;font-weight:750;margin-bottom:6px}input,textarea,select{width:100%;border:1px solid #ffffff1a;background:#080d16;color:#fff;border-radius:12px;padding:12px 13px;outline:none}input:focus,textarea:focus,select:focus{border-color:#55cfff88;box-shadow:0 0 0 3px #55cfff12}textarea{resize:vertical;min-height:82px}.row{display:flex;gap:9px;flex-wrap:wrap}.row>*{flex:1}.tabs{display:flex;gap:8px;overflow:auto;padding:2px 0 14px}.tab{white-space:nowrap;background:#ffffff0b;border:1px solid var(--line);color:#b8c5d9}.tab.active{background:#55cfff18;border-color:#55cfff66;color:#8ce2ff}.hidden{display:none!important}.toolbar{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:13px}.toolbar input{flex:1;min-width:170px}.item{display:flex;align-items:center;gap:12px;border:1px solid var(--line);background:#ffffff06;padding:12px;border-radius:14px;margin:9px 0}.item img{width:48px;height:48px;border-radius:12px;object-fit:cover;background:#ffffff0c}.info{flex:1;min-width:0}.title{font-weight:800;overflow-wrap:anywhere}.meta{color:var(--muted);font-size:12px;overflow-wrap:anywhere;margin-top:4px}.actions{display:flex;gap:6px}.actions button{padding:8px 10px;font-size:12px}.badge{font-size:10px;color:#8ce2ff;background:#55cfff18;border-radius:7px;padding:3px 7px;margin-left:5px}.empty{text-align:center;color:var(--muted);padding:22px}.note{font-size:12px;color:var(--muted);line-height:1.6;margin-top:12px}.topline{display:flex;align-items:center;justify-content:space-between;gap:12px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:17px}.stat{padding:14px;border-radius:15px;border:1px solid var(--line);background:#ffffff07}.stat b{font-size:22px;display:block}.stat span{font-size:12px;color:var(--muted)}@media(max-width:560px){.wrap{padding:16px 11px 50px}.card{padding:14px}.grid{grid-template-columns:1fr}.field.full{grid-column:auto}.item{align-items:flex-start;flex-wrap:wrap}.actions{width:100%}.actions button{flex:1}.stats{gap:7px}.stat{padding:10px}.stat b{font-size:19px}}
+</style></head><body><main class="wrap">
+<div class="brand"><div class="logo">H</div><div><h1>studymods<span style="color:#55cfff">.hrry</span></h1><div class="sub">ADMIN CONTROL CENTER · Firebase Realtime Database</div></div></div>
+<div id="status" class="status">Starting Firebase…</div>
+<section id="login-card" class="card login hidden"><h2>Admin sign in</h2><p class="sub" style="margin:0 0 16px">Use the Firebase Authentication account whose UID is authorized in your database rules.</p><form id="login-form"><div class="field"><label>ADMIN EMAIL</label><input id="email" type="email" autocomplete="username" required placeholder="admin email"></div><div class="field" style="margin-top:12px"><label>PASSWORD</label><input id="password" type="password" autocomplete="current-password" required placeholder="Firebase Auth password"></div><button style="width:100%;margin-top:15px" type="submit">Sign in securely</button></form><p class="note">The account UID must exactly match the UID configured in the Realtime Database rules. This page does not create or change admin accounts.</p></section>
+<div id="panel" class="hidden"><div class="topline" style="margin-bottom:13px"><div class="sub">Signed in as <b id="who" style="color:#fff"></b></div><button class="secondary" id="logout">Sign out</button></div>
+<div class="stats"><div class="stat"><b id="count-apps">—</b><span>Published apps</span></div><div class="stat"><b id="count-upcoming">—</b><span>Upcoming apps</span></div><div class="stat"><b id="count-banners">—</b><span>Banners</span></div></div>
+<div class="tabs"><button class="tab active" data-tab="apps">Published Apps</button><button class="tab" data-tab="upcoming">Upcoming</button><button class="tab" data-tab="banners">Banners</button><button class="tab" data-tab="update">App Update</button><button class="tab" data-tab="updates">Updates / Notices</button></div>
+<section id="section-apps" class="card"><h2 id="app-heading">Add published app</h2><form id="app-form"><input id="item-id" type="hidden"><input id="item-node" type="hidden" value="apps"><div class="grid"><div class="field"><label>APP NAME</label><input id="app-name" required placeholder="e.g. PW MOD"></div><div class="field"><label>DISPLAY ORDER</label><input id="app-order" type="number" min="1" value="1"></div><div class="field full"><label>LOGO IMAGE URL</label><input id="app-logo" type="url" required placeholder="https://…/logo.png"></div><div class="field full"><label>APP LINK (opens from user app)</label><input id="app-link" type="url" placeholder="https://…"></div><div class="field full"><label>SHORT DESCRIPTION</label><textarea id="app-desc" placeholder="Short description"></textarea></div></div><div class="row" style="margin-top:12px"><button id="app-save" type="submit">Save app</button><button class="secondary hidden" id="app-cancel" type="button">Cancel edit</button></div></form><p class="note">Important: the unchanged User App reads published apps from <b>apps</b> and only displays records with <b>status: "Published"</b>. This admin writes to that exact path.</p><hr style="border:0;border-top:1px solid var(--line);margin:18px 0"><div class="toolbar"><input id="app-search" placeholder="Search published apps…"><button class="secondary" data-reload="apps">Reload</button></div><div id="apps-list" class="empty">Loading…</div></section>
+<section id="section-upcoming" class="card hidden"><h2 id="up-heading">Add upcoming app</h2><form id="up-form"><input id="up-id" type="hidden"><div class="grid"><div class="field"><label>APP NAME</label><input id="up-name" required></div><div class="field"><label>DISPLAY ORDER</label><input id="up-order" type="number" min="1" value="1"></div><div class="field full"><label>LOGO IMAGE URL</label><input id="up-logo" type="url" required placeholder="https://…/logo.png"></div><div class="field full"><label>APP LINK (OPTIONAL)</label><input id="up-link" type="url" placeholder="https://…"></div><div class="field full"><label>DESCRIPTION / RELEASE NOTE</label><textarea id="up-desc"></textarea></div></div><div class="row" style="margin-top:12px"><button type="submit" id="up-save">Save upcoming app</button><button type="button" id="up-cancel" class="secondary hidden">Cancel edit</button></div></form><p class="note">Records are stored at <b>upcoming</b>, the exact path used by the User App.</p><hr style="border:0;border-top:1px solid var(--line);margin:18px 0"><div class="toolbar"><input id="up-search" placeholder="Search upcoming apps…"><button class="secondary" data-reload="upcoming">Reload</button></div><div id="upcoming-list" class="empty">Loading…</div></section>
+<section id="section-banners" class="card hidden"><h2 id="banner-heading">Add home banner</h2><form id="banner-form"><input id="banner-id" type="hidden"><div class="grid"><div class="field full"><label>BANNER IMAGE URL</label><input id="banner-image" type="url" required placeholder="https://…/banner.jpg"></div><div class="field full"><label>BANNER TEXT (OPTIONAL)</label><input id="banner-text" placeholder="New app available"></div><div class="field full"><label>CLICK LINK (OPTIONAL)</label><input id="banner-link" type="url" placeholder="https://…"></div><div class="field"><label>DISPLAY ORDER</label><input id="banner-order" type="number" min="1" value="1"></div><div class="field"><label>STATUS</label><select id="banner-active"><option value="true">Active</option><option value="false">Hidden</option></select></div></div><div class="row" style="margin-top:12px"><button type="submit" id="banner-save">Save banner</button><button type="button" id="banner-cancel" class="secondary hidden">Cancel edit</button></div></form><p class="note">User App expects <b>imageUrl</b>, <b>text</b>, <b>link</b>, <b>order</b>, and <b>active</b> under <b>banners</b>.</p><hr style="border:0;border-top:1px solid var(--line);margin:18px 0"><div id="banners-list" class="empty">Loading…</div></section>
+<section id="section-update" class="card hidden"><h2>Live app update</h2><p class="sub" style="margin:0 0 14px">Saves to <b>appUpdate/live</b>, read by the unchanged User App.</p><form id="update-form"><div class="grid"><div class="field"><label>VERSION</label><input id="version" required placeholder="e.g. 2.1"></div><div class="field"><label>UPDATE ENABLED</label><select id="update-enabled"><option value="true">Enabled</option><option value="false">Disabled</option></select></div><div class="field full"><label>DOWNLOAD LINK</label><input id="download-link" type="url" placeholder="https://…/app.apk"></div><div class="field full"><label>IMPORTANT MESSAGE</label><textarea id="important-message" placeholder="What changed in this version?"></textarea></div></div><button type="submit" style="margin-top:12px">Save live update</button></form><div id="update-current" class="note" style="margin-top:14px">Loading current setting…</div></section>
+<section id="section-updates" class="card hidden"><h2>Add update / notice</h2><p class="sub" style="margin:0 0 14px">Generic records are stored under <b>updates</b>. Your current User App does not read this path directly; its live update prompt reads <b>appUpdate/live</b>.</p><form id="notice-form"><div class="grid"><div class="field"><label>TITLE</label><input id="notice-title" required></div><div class="field"><label>ACTIVE</label><select id="notice-active"><option value="true">Active</option><option value="false">Hidden</option></select></div><div class="field full"><label>MESSAGE</label><textarea id="notice-message" required></textarea></div><div class="field full"><label>LINK (OPTIONAL)</label><input id="notice-link" type="url"></div></div><button type="submit" style="margin-top:12px">Publish notice</button></form><hr style="border:0;border-top:1px solid var(--line);margin:18px 0"><div id="updates-list" class="empty">Loading…</div></section>
+</div></main>
+<script type="module">
+import {initializeApp} from 'https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js';
+import {getAuth,signInWithEmailAndPassword,onAuthStateChanged,signOut} from 'https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js';
+import {getDatabase,ref,onValue,get,set,push,update,remove} from 'https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js';
+const ADMIN_UID='AZ1JZ0zZdYYcwc47PYvpLiGIGVr1';
+const firebaseConfig={apiKey:'AIzaSyAGJsBtv72SIH0rQjk42SMFgMb2DpzwlBI',authDomain:'ewhe-1827a.firebaseapp.com',databaseURL:'https://ewhe-1827a-default-rtdb.firebaseio.com/',projectId:'ewhe-1827a',storageBucket:'ewhe-1827a.firebasestorage.app',messagingSenderId:'528686843390',appId:'1:528686843390:web:08daf51901bd1c58ffacaf'};
+const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getDatabase(app);const $=id=>document.getElementById(id);let currentUser=null;const cache={apps:{},upcoming:{},banners:{},updates:{}};
+function status(msg,error=false){$('status').textContent=msg;$('status').style.color=error?'#ff9aa4':'#b9eaff'}
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function requireAdmin(){if(!currentUser||currentUser.uid!==ADMIN_UID)throw new Error('Not authorized. Sign in with the admin account whose UID is allowed by Firebase rules.');}
+function showPanel(user){currentUser=user;$('login-card').classList.add('hidden');$('panel').classList.remove('hidden');$('who').textContent=user.email||user.uid;status('Authenticated admin. Loading database paths…');['apps','upcoming','banners','updates'].forEach(node=>onValue(ref(db,node),snap=>{cache[node]=snap.val()||{};render(node);counts();status('Connected · reading apps, upcoming, banners and updates.');},err=>{status('Read failed at '+node+': '+err.message+' — check database rules.',true);renderError(node,err)}));onValue(ref(db,'appUpdate/live'),snap=>{const d=snap.val()||{};$('version').value=d.version||'';$('download-link').value=d.downloadLink||'';$('important-message').value=d.importantMessage||'';$('update-enabled').value=String(d.enabled!==false);$('update-current').textContent=snap.exists()?'Current live update: '+JSON.stringify(d):'No live update configured yet.'},err=>status('Cannot read appUpdate/live: '+err.message,true));}
+function renderError(node,err){const id=node==='apps'?'apps-list':node==='upcoming'?'upcoming-list':node==='banners'?'banners-list':'updates-list';$(id).innerHTML='<p class="empty">Firebase error: '+esc(err.message)+'</p>'}
+function counts(){$('count-apps').textContent=Object.keys(cache.apps).length;$('count-upcoming').textContent=Object.keys(cache.upcoming).length;$('count-banners').textContent=Object.keys(cache.banners).length}
+function listRecords(node){return Object.entries(cache[node]||{}).map(([id,data])=>({id,...(data||{})})).sort((a,b)=>(Number(a.order)||999)-(Number(b.order)||999))}
+function render(node){const list=listRecords(node),box=$(node==='apps'?'apps-list':node==='upcoming'?'upcoming-list':node==='banners'?'banners-list':'updates-list');if(node==='apps'||node==='upcoming'){const query=$(node==='apps'?'app-search':'up-search').value.toLowerCase().trim();const items=list.filter(x=>[x.name,x.title,x.description,x.link,x.url].some(v=>String(v||'').toLowerCase().includes(query)));box.innerHTML=items.length?items.map(x=>`<div class="item"><img src="${esc(x.logo||x.image||x.thumbnail||'')}" onerror="this.style.visibility='hidden'" alt=""><div class="info"><div class="title">${esc(x.name||x.title||'Untitled')} <span class="badge">${node==='apps'?'PUBLISHED':'UPCOMING'}</span></div><div class="meta">Order: ${esc(x.order||999)} · ${esc(x.description||'No description')}<br>${esc(x.link||x.url||'No link')}</div></div><div class="actions"><button class="green" data-edit="${esc(node)}:${esc(x.id)}">Edit</button><button class="danger" data-delete="${esc(node)}:${esc(x.id)}">Delete</button></div></div>`).join(''):'<p class="empty">No records found.</p>';}else if(node==='banners'){box.innerHTML=list.length?list.map(x=>`<div class="item"><img src="${esc(x.imageUrl||'')}" onerror="this.style.visibility='hidden'" alt=""><div class="info"><div class="title">${esc(x.text||'Banner')} <span class="badge">${x.active===false?'HIDDEN':'ACTIVE'}</span></div><div class="meta">Order: ${esc(x.order||999)} · ${esc(x.imageUrl||'')}<br>Link: ${esc(x.link||'No link')}</div></div><div class="actions"><button class="green" data-edit="banners:${esc(x.id)}">Edit</button><button class="danger" data-delete="banners:${esc(x.id)}">Delete</button></div></div>`).join(''):'<p class="empty">No banners configured.</p>';}else{box.innerHTML=list.length?list.map(x=>`<div class="item"><div class="info"><div class="title">${esc(x.title||'Notice')} <span class="badge">${x.active===false?'HIDDEN':'ACTIVE'}</span></div><div class="meta">${esc(x.message||'')}<br>${esc(x.link||'No link')}</div></div><div class="actions"><button class="danger" data-delete="updates:${esc(x.id)}">Delete</button></div></div>`).join(''):'<p class="empty">No notices configured.</p>';}box.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>edit(b.dataset.edit.split(':')[0],b.dataset.edit.split(':')[1])));box.querySelectorAll('[data-delete]').forEach(b=>b.addEventListener('click',()=>deleteRecord(b.dataset.delete.split(':')[0],b.dataset.delete.split(':')[1])))}
+async function saveRecord(path,id,data){requireAdmin();if(id)await update(ref(db,path+'/'+id),{...data,updatedAt:Date.now()});else await set(push(ref(db,path)),{...data,createdAt:Date.now(),updatedAt:Date.now()});status('Saved successfully at '+path+'.')}
+$('login-form').addEventListener('submit',async e=>{e.preventDefault();try{status('Signing in…');const cred=await signInWithEmailAndPassword(auth,$('email').value.trim(),$('password').value);if(cred.user.uid!==ADMIN_UID){await signOut(auth);throw new Error('Signed in, but this account UID is not the admin UID authorized by your rules.');}showPanel(cred.user)}catch(err){status('Sign-in failed: '+err.message,true)}});
+onAuthStateChanged(auth,user=>{if(!user){currentUser=null;$('panel').classList.add('hidden');$('login-card').classList.remove('hidden');status('Sign in with the authorized Firebase admin account.');return}if(user.uid!==ADMIN_UID){signOut(auth).catch(()=>{});status('Access denied: account UID does not match the configured admin UID.',true);return}showPanel(user)});
+$('logout').addEventListener('click',()=>signOut(auth));
+document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===b));['apps','upcoming','banners','update','updates'].forEach(n=>$('section-'+n).classList.toggle('hidden',n!==b.dataset.tab))}));
+$('app-form').addEventListener('submit',async e=>{e.preventDefault();try{const id=$('item-id').value;const data={name:$('app-name').value.trim(),title:$('app-name').value.trim(),logo:$('app-logo').value.trim(),image:$('app-logo').value.trim(),thumbnail:$('app-logo').value.trim(),link:$('app-link').value.trim(),url:$('app-link').value.trim(),description:$('app-desc').value.trim(),status:'Published',order:Number($('app-order').value)||999};await saveRecord('apps',id,data);resetAppForm();}catch(err){status('Save failed: '+err.message,true)}});
+$('up-form').addEventListener('submit',async e=>{e.preventDefault();try{const id=$('up-id').value;const name=$('up-name').value.trim(),logo=$('up-logo').value.trim(),link=$('up-link').value.trim();await saveRecord('upcoming',id,{name,title:name,logo,image:logo,thumbnail:logo,link,url:link,description:$('up-desc').value.trim(),status:'Upcoming',order:Number($('up-order').value)||999});resetUpForm()}catch(err){status('Save failed: '+err.message,true)}});
+$('banner-form').addEventListener('submit',async e=>{e.preventDefault();try{const id=$('banner-id').value;await saveRecord('banners',id,{imageUrl:$('banner-image').value.trim(),text:$('banner-text').value.trim(),link:$('banner-link').value.trim(),order:Number($('banner-order').value)||999,active:$('banner-active').value==='true'});resetBannerForm()}catch(err){status('Banner save failed: '+err.message,true)}});
+$('update-form').addEventListener('submit',async e=>{e.preventDefault();try{requireAdmin();const data={version:$('version').value.trim(),downloadLink:$('download-link').value.trim(),importantMessage:$('important-message').value.trim(),enabled:$('update-enabled').value==='true',updatedAt:Date.now()};await set(ref(db,'appUpdate/live'),data);status('Live update saved at appUpdate/live.')}catch(err){status('Update save failed: '+err.message,true)}});
+$('notice-form').addEventListener('submit',async e=>{e.preventDefault();try{await saveRecord('updates','',{title:$('notice-title').value.trim(),message:$('notice-message').value.trim(),link:$('notice-link').value.trim(),active:$('notice-active').value==='true'});$('notice-form').reset()}catch(err){status('Notice save failed: '+err.message,true)}});
+function resetAppForm(){$('app-form').reset();$('item-id').value='';$('app-order').value='1';$('app-heading').textContent='Add published app';$('app-save').textContent='Save app';$('app-cancel').classList.add('hidden')}$('app-cancel').addEventListener('click',resetAppForm);
+function resetUpForm(){$('up-form').reset();$('up-id').value='';$('up-order').value='1';$('up-heading').textContent='Add upcoming app';$('up-save').textContent='Save upcoming app';$('up-cancel').classList.add('hidden')}$('up-cancel').addEventListener('click',resetUpForm);
+function resetBannerForm(){$('banner-form').reset();$('banner-id').value='';$('banner-order').value='1';$('banner-heading').textContent='Add home banner';$('banner-save').textContent='Save banner';$('banner-cancel').classList.add('hidden')}$('banner-cancel').addEventListener('click',resetBannerForm);
+function edit(node,id){const x=cache[node]?.[id];if(!x)return;if(node==='apps'){$('item-id').value=id;$('app-name').value=x.name||x.title||'';$('app-logo').value=x.logo||x.image||x.thumbnail||'';$('app-link').value=x.link||x.url||'';$('app-desc').value=x.description||'';$('app-order').value=x.order||1;$('app-heading').textContent='Edit published app';$('app-save').textContent='Update app';$('app-cancel').classList.remove('hidden');document.querySelector('[data-tab="apps"]').click();window.scrollTo({top:0,behavior:'smooth'})}else if(node==='upcoming'){$('up-id').value=id;$('up-name').value=x.name||x.title||'';$('up-logo').value=x.logo||x.image||x.thumbnail||'';$('up-link').value=x.link||x.url||'';$('up-desc').value=x.description||'';$('up-order').value=x.order||1;$('up-heading').textContent='Edit upcoming app';$('up-save').textContent='Update upcoming app';$('up-cancel').classList.remove('hidden');document.querySelector('[data-tab="upcoming"]').click();window.scrollTo({top:0,behavior:'smooth'})}else if(node==='banners'){$('banner-id').value=id;$('banner-image').value=x.imageUrl||'';$('banner-text').value=x.text||'';$('banner-link').value=x.link||'';$('banner-order').value=x.order||1;$('banner-active').value=String(x.active!==false);$('banner-heading').textContent='Edit home banner';$('banner-save').textContent='Update banner';$('banner-cancel').classList.remove('hidden');document.querySelector('[data-tab="banners"]').click();window.scrollTo({top:0,behavior:'smooth'})}}
+async function deleteRecord(node,id){if(!confirm('Permanently delete this record from '+node+'/'+id+'?'))return;try{requireAdmin();await remove(ref(db,node+'/'+id));status('Deleted '+node+'/'+id)}catch(err){status('Delete failed: '+err.message,true)}}
+$('app-search').addEventListener('input',()=>render('apps'));$('up-search').addEventListener('input',()=>render('upcoming'));document.querySelectorAll('[data-reload]').forEach(b=>b.addEventListener('click',async()=>{try{requireAdmin();const n=b.dataset.reload,s=await get(ref(db,n));cache[n]=s.val()||{};render(n);counts();status('Reloaded '+n+'.')}catch(e){status('Reload failed: '+e.message,true)}}));
+</script></body></html>
